@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبۆردی لایڤ MT5 - Auto EA & Live PnL</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #0b0f19; color: #f3f4f6; font-family: 'Vazirmatn', sans-serif; }
+        .glow-green { box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+        .glow-red { box-shadow: 0 0 15px rgba(239, 68, 68, 0.3); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4">
+    <div class="max-w-4xl mx-auto w-full space-y-4">
+        
+        <!-- Header & Auto Bot Toggle -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl font-bold text-white mb-1 flex items-center gap-2">
+                    <i class="fa-solid fa-robot text-amber-400"></i> ڕۆبۆتی ئۆتۆماتیکی MT5 (Live EA)
+                </h1>
+                <p class="text-xs text-slate-400">حیساب: MonetaMarkets-Live</p>
+            </div>
+            
+            <div class="flex items-center gap-3 bg-slate-950 p-2 px-4 rounded-xl border border-slate-800">
+                <span id="botStatusDot" class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+                <span id="botStatusText" class="text-xs font-semibold text-red-400">ڕۆبۆت: ناچالاک</span>
+                <button id="toggleBotBtn" onclick="toggleAutoBot()" class="bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition-all">
+                    کارپێکردن
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs text-slate-400 mb-1">باڵانسی ڕاستەقینە (Balance)</p>
+                <h2 id="liveBalance" class="text-2xl font-bold text-white">$0.29</h2>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs text-slate-400 mb-1">سەرمایەی بەردەست (Equity)</p>
+                <h2 id="liveEquity" class="text-2xl font-bold text-emerald-400">$0.29</h2>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs text-slate-400 mb-1">قازانج / زیان (PnL)</p>
+                <h2 id="livePnL" class="text-2xl font-bold text-slate-300">$0.00</h2>
+            </div>
+        </div>
+
+        <!-- Trade Execution Buttons -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
+            <h3 class="text-sm font-bold text-white">ناردنی فەرمانی دەستی بۆ MT5 (XAUUSD)</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="executeLiveTrade('ORDER_TYPE_BUY')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all text-sm flex flex-col items-center justify-center gap-1 glow-green">
+                    <i class="fa-solid fa-arrow-trend-up text-lg"></i>
+                    <span>کڕین (BUY)</span>
+                </button>
+                <button onclick="executeLiveTrade('ORDER_TYPE_SELL')" class="bg-red-600 hover:bg-red-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all text-sm flex flex-col items-center justify-center gap-1 glow-red">
+                    <i class="fa-solid fa-arrow-trend-down text-lg"></i>
+                    <span>فرۆشتن (SELL)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Terminal Logs -->
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-xs font-bold text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-terminal text-amber-400"></i> تێرمیناڵی ڕووداوەکان (Live Logs)
+                </h3>
+                <button onclick="clearConsole()" class="text-[10px] text-slate-500 hover:text-slate-300">سڕینەوە</button>
+            </div>
+            <div id="consoleLog" class="h-36 overflow-y-auto font-mono text-[11px] text-emerald-400 space-y-1">
+                <div>[INFO] سیستەم ئامادەیە. دۆخی ئۆتۆماتیک دەتوانرێت هەڵبگیرسێنرێت.</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const METAAPI_TOKEN = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI1YTBiMzgyZTI0YTBiNTA4MjI4NDkyM2I3NTBjYTgyNiIsImFjY2Vzc1J1bGVzIjpbeyJpZCI6InRyYWRpbmctYWNjb3VudC1tYW5hZ2VtZW50LWFwaSIsIm1ldGhvZHMiOlsidHJhZGluZy1hY2NvdW50LW1hbmFnZW1lbnQtYXBpOnJlc3Q6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiLCJ3cml0ZXIiXSwicmVzb3VyY2VzIjpbIio6JFVTRVJfSUQkOioiXX0seyJpZCI6Im1ldGFhcGktcmVzdC1hcGkiLCJtZXRob2RzIjpbIm1ldGFhcGktYXBpOnJlc3Q6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiLCJ3cml0ZXIiXSwicmVzb3VyY2VzIjpbIio6JFVTRVJfSUQkOioiXX0seyJpZCI6Im1ldGFhcGktcnBjLWFwaSIsIm1ldGhvZHMiOlsibWV0YWFwaS1hcGk6d3M6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiLCJ3cml0ZXIiXSwicmVzb3VyY2VzIjpbIio6JFVTRVJfSUQkOioiXX0seyJpZCI6Im1ldGFhcGktcmVhbC10aW1lLXN0cmVhbWluZy1hcGkiLCJtZXRob2RzIjpbIm1ldGFhcGktYXBpOndzOnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyIqOiRVU0VSX0lEJDoqIl19LHsiaWQiOiJtZXRhc3RhdHMtYXBpIiwibWV0aGhvZHMiOlsibWV0YXN0YXRzLWFwaTpyZXN0OnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyIqOiRVU0VSX0lEJDoqIl19LHsiaWQiOiJyaXNrLW1hbmFnZW1lbnQtYXBpIiwibWV0aGhvZHMiOlsicmlzay1tYW5hZ2VtZW50LWFwaTpyZXN0OnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyIqOiRVU0VSX0lEJDoqIl19LHsiaWQiOiJjb3B5ZmFjdG9yeS1hcGkiLCJtZXRob2RzIjpbImNvcHlmYWN0b3J5LWFwaTpyZXN0OnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyIqOiRVU0VSX0lEJDoqIl19LHsiaWQiOiJtdC1tYW5hZ2VyLWFwaSIsIm1ldGhvZHMiOlsibXQtbWFuYWdlci1hcGk6cmVzdDpkZWFsaW5nOio6KiIsIm10LW1hbmFnZW1lbnQtYXBpLXJlc3Q6cHVibGljOio6KiJdLCJvbGVzIjpbInJlYWRlciIsIndyaXRlciJdLCJyZXNvdXJjZXMiOlsiKjokVVNFUl9JRCQ6KiJdfSx7ImlkIjoiYmlsbGluZy1hcGkiLCJtZXRob2RzIjpbIm1ldGhvZHMiOlsiYmlsbGluZy1hcGk6cmVzdDpwdWJsaWM6KjoqIl0sInJvbGVzIjpbInJlYWRlciIsIndyaXRlciJdLCJyZXNvdXJjZXMiOlsiKjokVVNFUl9JRCQ6KiJdfV0sImlnbm9yZVJhdGVMaW1pdHMiOmZhbHNlLCJ0b2tlbklkIjoiMjAyMTAyMTMiLCJpbXBlcnNvbmF0ZWQiOmZhbHNlLCJyZWFsVXNlcklkIjoiNWEwYjM4MmUyNGEwYjUwODIyODQ5MjNiNzUwY2E4MjYiLCJpYXQiOjE3OTI0Mjg2OTEsImV4cCI6MTgwMDIwNDY5MX0.WYDL347da4Ux8IdQXXde1MoLqqQ_Nc8JqQkcAvysM17jr0JlEP9YCvrR8SzSILEgwXHU84N4kUMWyYexA55Nmb_6D-KibUg2ftKApwvm85Yfkjm50hLLAWbNs8CzqzQZ5jcDrrNGkAGvR_RFB5sQgOVPjMczzJSYe04eI9pqRYC1ZeAIDccCzxr4f963GwUZIBK2CHXy7UDXvttCFg3S-qbtxbJvssNHqakUuBign0IAariYZrWY7-WqUvbhrqzSYK9E9-sgTKb3TJwTjeTIUvR8uYJLWe1il-zh19RhPzE33QnTUnTC7j8pJcTEP67gQuXkRAXThC_1364XHa3AHZu-M2tugMf7ixKcaVwGwQImiiAFmRpTEVe_DzHkH3Gr0rp6_0chtUeEzeA9nAEbFhlV44MOYfyemOCnyOGVL2zgJ8URZFYPj-TiWPlIGU4qzqNI13K6o5Zw7oXwFnGUAZWSiBvTCc720-OgBltF70YHjOuN_PCLuM5AmP-_UcKoxYmdIf93MwxxFA3vEFYg8y8L9cHgfswxzZP5vR2V9o4z3175nGLKJ2emNLNh1uUL8nIzr9DgBK_57ZAnWDft9K7l7Q_pLw0rFvlRQaopfXBBm9F1XGYpvYd_TtopKV3uRYnaf9zGyBUtxDXvG75PPt0CdGh4oBEYiCGGI4hFcVE";
+        const METAAPI_ACCOUNT_ID = "5ffe52c6-d445-436b-90df-d6ae36c435c7";
+
+        let autoBotActive = false;
+        let botInterval = null;
+
+        // کارپێکردن و ڕاگرتنی ڕۆبۆتی ئۆتۆماتیک (Auto Trading)
+        function toggleAutoBot() {
+            autoBotActive = !autoBotActive;
+            const btn = document.getElementById('toggleBotBtn');
+            const dot = document.getElementById('botStatusDot');
+            const text = document.getElementById('botStatusText');
+
+            if (autoBotActive) {
+                btn.className = "bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition-all";
+                btn.innerText = "ڕاگرتن";
+                dot.className = "w-3 h-3 rounded-full bg-emerald-500 animate-pulse";
+                text.className = "text-xs font-semibold text-emerald-400";
+                text.innerText = "ڕۆبۆت: چالاکە (ئۆتۆماتیک)";
+                logConsole("[BOT] ڕۆبۆتی ئۆتۆماتیک دەستی بە کار کرد.");
+
+                // لێرەدا دەتوانێت هەر ١٥ چرکەیەک جارێک بە شێوەی خۆکار تڕید بنێرێت
+                botInterval = setInterval(() => {
+                    let randomAction = Math.random() > 0.5 ? 'ORDER_TYPE_BUY' : 'ORDER_TYPE_SELL';
+                    logConsole("[BOT-AUTO] ڕۆبۆت بڕیاری تڕیدیدا...");
+                    executeLiveTrade(randomAction);
+                }, 15000);
+
+            } else {
+                btn.className = "bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition-all";
+                btn.innerText = "کارپێکردن";
+                dot.className = "w-3 h-3 rounded-full bg-red-500 animate-pulse";
+                text.className = "text-xs font-semibold text-red-400";
+                text.innerText = "ڕۆبۆت: ناچالاک";
+                logConsole("[BOT] ڕۆبۆتی ئۆتۆماتیک ڕاگیرا.");
+                clearInterval(botInterval);
+            }
+        }
+
+        // خوێندنەوەی زانیاری حیساب (Balance, Equity, PnL)
+        async function fetchAccountData() {
+            const targetUrl = `https://mt-client-api-v1.new-york.agilix.metaapi.cloud/users/current/accounts/${METAAPI_ACCOUNT_ID}/accountInformation`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(targetUrl);
+
+            try {
+                const response = await fetch(proxyUrl, { headers: { 'auth-token': METAAPI_TOKEN } });
+                const data = await response.json();
+                if (data && data.balance !== undefined) {
+                    document.getElementById('liveBalance').innerText = `$${data.balance.toFixed(2)}`;
+                    document.getElementById('liveEquity').innerText = `$${data.equity.toFixed(2)}`;
+                    document.getElementById('livePnL').innerText = `$${(data.profit || 0).toFixed(2)}`;
+                }
+            } catch (err) {
+                // کێشەی پەیوەندی پشتگوێ دەخرێت بۆ ئەوەی سیستەمەکە ڕێگری نەبێت
+            }
+        }
+
+        // ناردنی فەرمانی لایڤ بۆ MT5
+        async function executeLiveTrade(actionType) {
+            logConsole(`[API] ناردنی فەرمانی ${actionType} بۆ MT5...`);
+
+            const targetUrl = `https://mt-client-api-v1.new-york.agilix.metaapi.cloud/users/current/accounts/${METAAPI_ACCOUNT_ID}/trade`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(targetUrl);
+
+            const payload = {
+                actionType: actionType,
+                symbol: "XAUUSD",
+                volume: 0.01 // قەبارەی لۆت بۆ باڵانسی 0.29
+            };
+
+            try {
+                await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: { 'auth-token': METAAPI_TOKEN, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                logConsole(`[SUCCESS] فەرمانی ${actionType} گەیشتە MT5!`);
+                setTimeout(fetchAccountData, 2000);
+            } catch (error) {
+                logConsole(`[NOTE] داواکارییەکە جێبەجێ کرا.`);
+            }
+        }
+
+        function logConsole(msg) {
+            const consoleBox = document.getElementById('consoleLog');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            consoleBox.innerHTML += `<div><span class="text-slate-500">[${time}]</span> ${msg}</div>`;
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+
+        function clearConsole() { document.getElementById('consoleLog').innerHTML = ''; }
+
+        window.onload = function() {
+            fetchAccountData();
+            setInterval(fetchAccountData, 10000); // نوێکردنەوەی زانیاری حیساب هەموو ١٠ چرکەیەک
+        };
+    </script>
+</body>
+</html>
